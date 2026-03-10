@@ -19,6 +19,9 @@ Reusable skills for Claude Code and Claude Desktop. Teach Claude proven patterns
 | **ai-model-fallback** | Multi-model AI resilience (Gemini → GPT fallback pattern) |
 | **python-retry-resilience** | HTTP retries with exponential backoff and rate limit handling |
 | **flask-cors-patterns** | CORS whitelist, preflight handling, credential support |
+| **gmail-send-as-gcp** | Send email as a Google Group address from GCP using Gmail API + OAuth2 refresh token |
+| **coda-readonly-integration** | Fetch structured data from Coda tables via REST API with pagination and caching |
+| **appengine-cron-scheduling** | App Engine cron with user-configurable frequency (daily/weekly/custom) using a single hourly job |
 
 ### Frontend Patterns (General-purpose)
 
@@ -34,6 +37,7 @@ Reusable skills for Claude Code and Claude Desktop. Teach Claude proven patterns
 |-------|-------------|
 | **firebase-internal-tools** | Firebase Hosting + App Engine + Firestore for internal tools |
 | **excel-report-generation** | Professional multi-sheet Excel reports with openpyxl |
+| **firestore-field-level-rules** | Per-field update restrictions using affectedKeys/hasOnly patterns |
 
 ## Setup: Claude Code
 
@@ -55,6 +59,8 @@ Skills activate automatically based on what you're doing. For example:
 - "Add retry logic to my API client" → activates `python-retry-resilience`
 - "Generate an Excel report" → activates `excel-report-generation`
 - "Add sound effects to my web app" → activates `web-audio-synthesis`
+- "Send email from a Google Group" → activates `gmail-send-as-gcp`
+- "Add Firestore field-level permissions" → activates `firestore-field-level-rules`
 
 ## Setup: Claude Desktop (claude.ai)
 
