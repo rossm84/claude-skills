@@ -7,67 +7,71 @@ description: Use when composing Slack messages via MCP tools (slack_send_message
 
 ## The Core Problem
 
-Both `slack_send_message` and `slack_send_message_draft` strip all blank lines. You cannot create paragraph spacing. Messages that look structured in your editor render as walls of text.
+Both `slack_send_message` and `slack_send_message_draft` strip all blank lines. You cannot create paragraph spacing. Blockquotes (`>`) merge into one continuous left-bar. The only element that creates visual separation is a code block.
 
-## What Renders
+## What Works
 
-- `*bold*` — works (NOT `**bold**`)
-- `_italic_` — works
-- `` `inline code` `` — works
-- Code blocks (triple backtick with newline after opening) — works, creates a visual box
-- `<url|display text>` — works for links
-- `<@U123456>` — works for mentions
+- `*bold*` — renders (NOT `**bold**`)
+- `_italic_` — renders
+- `` `inline code` `` — renders
+- Code blocks (triple backtick with newline after opening) — renders as a visual box
+- `<url|display text>` — renders as link
+- `<@U123456>` — renders as mention
 
-## What Does NOT Render
+## What Does NOT Work
 
-- Blank lines for paragraph spacing — stripped completely
-- `>` blockquotes for section separation — merges into one continuous left-bar
-- `## Headers` — not supported in Slack
-- `---` horizontal rules — renders as literal text
+- Blank lines for spacing — stripped by both send and draft APIs
+- `>` blockquotes for sections — merges into one continuous left-bar quote
+- `## Headers` — not supported
+- `---` horizontal rules — literal text
 - Tables — not supported
-- Syntax highlighting in code blocks — ignored
+- Syntax highlighting — ignored
 
-## The Only Working Approach
+## The Pattern: Main Message + Thread Replies
 
-*Keep messages short and conversational.* Do not attempt multi-section structured layouts — they will collapse into walls of text.
+Do NOT attempt multi-section messages. They collapse into walls of text.
 
-For messages with technical detail, split into two parts:
-1. *Main message:* Short, flowing text (2-3 sentences max) with `*bold*` for key terms
-2. *Thread reply:* Post the code, data, and detailed notes as a reply
+Instead, split every structured message into:
 
-Code blocks are the ONLY element that creates visual separation. Use them for code, but do not abuse them for non-code content.
+1. *Main message:* 2-3 sentences max. The key point, bolded terms, and "Detail in thread below."
+2. *Thread replies:* One reply per section (mapping, code, notes). Each focused on one topic.
 
-## Template
+Use `thread_ts` from the main message response to post replies.
 
-Main message:
+## Example
+
+*Main message:*
 ```
-Short summary with *key point* bolded. One more sentence of context. Detail is in the thread below.
+You don't need `metrics_agg`. The table powering the Ops Deck is `cs-analytics-dev.tableau_views.cs_ops_data_glue` — it has all 5 metrics plus a `target_delta` column. So "red" is just `WHERE target_delta < 0`. Detail in thread below.
 ```
 
-Thread reply (use `thread_ts` parameter):
+*Thread reply 1 — mapping:*
 ```
 *Metric mapping*
 SLA → `service_response_time_hit_rate`
 Resolution → `survey_resolution`
-
-*The query*
-\`\`\`
-SELECT * FROM table
-WHERE condition = true
-\`\`\`
-
-*Notes*
-First note about something important.
-Second note about a caveat.
 ```
 
-The thread reply will also lose blank lines, but that matters less because threads are expected to be denser and readers are already in "detail mode."
+*Thread reply 2 — code:*
+```
+*The query*
+\`\`\`
+SELECT * FROM table WHERE condition
+\`\`\`
+```
 
-## Slack mrkdwn Quick Reference
+*Thread reply 3 — notes:*
+```
+*Worth knowing*
+- First caveat
+- Second caveat
+```
+
+## Quick Reference
 
 - Bold: `*text*` (single asterisk)
 - Italic: `_text_`
 - Links: `<url|display text>` not `[text](url)`
-- User mention: `<@U123456>`
-- Channel mention: `<#C123456>`
+- Mentions: `<@U123456>` for users, `<#C123456>` for channels
 - No headers, no rules, no tables, no syntax highlighting
+- No blank line spacing — stripped by API
