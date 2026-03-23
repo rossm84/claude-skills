@@ -1,37 +1,67 @@
 ---
 name: wcag-aaa-audit
-description: Run WCAG 2.2 AAA compliance checks on the Migration Planning Dashboard. Use when modifying any file in public/app/ to ensure accessibility standards are maintained.
-trigger: after modifying files in public/app/
+description: Pre-deploy WCAG 2.2 accessibility audit for the Migration Planning Dashboard. MUST run before any deploy of public/app/ files. Checks contrast, keyboard, ARIA, semantics, target sizes. Use when modifying any file in public/app/ or before deploying frontend.
+trigger: before deploying frontend, after modifying files in public/app/
 ---
 
-# WCAG 2.2 AAA Audit
+# WCAG 2.2 Pre-Deploy Accessibility Audit
 
-Run this skill after any change to files in `public/app/` to verify WCAG 2.2 Level AAA compliance is maintained.
+**Run this before every frontend deploy.** The app claims AA compliance and targets AAA.
 
-## Checklist
+## Automated Checks (run these)
 
-After making changes, verify each of these:
+```bash
+# 1. Forbidden text colours on dark backgrounds (must use AAA-safe alternatives)
+echo "=== Checking forbidden text colours ==="
+grep -rn 'color.*#1db954\|color.*#10b981\|color.*#f59e0b\|color.*#ef4444\|color.*#6366f1\|color.*#8b5cf6\|color.*#3b82f6\|color.*#f87171' public/app/*.js public/app/*.html public/app/*.css | grep -v 'background\|border\|accent\|stroke\|fill\|var(--\|//\|/\*\|\.btn-danger:hover'
 
-### 1. Contrast (1.4.6 — 7:1 minimum)
+# 2. Clickable div/span without keyboard support
+echo "=== Checking keyboard accessibility ==="
+grep -n '<div.*onclick\|<span.*onclick' public/app/*.html public/app/*.js | grep -v 'role="button"\|tabindex\|<button'
 
-**Never use these raw colours as text on dark backgrounds:**
-- `#1db954` (Spotify green) — use `#4ade80` or `var(--spotify-green-text)` for text
-- `#10b981` (emerald) — use `#34d399` or `var(--color-success)` for text
-- `#f59e0b` (amber) — use `#fbbf24` or `var(--color-warning)` for text
-- Any gray darker than `#a0a0a0` for text on `#121212`
+# 3. Images/icons without alt text or aria-label
+echo "=== Checking non-text content ==="
+grep -n '<img ' public/app/*.html | grep -v 'alt=\|aria-'
+grep -n '<svg ' public/app/*.html | head -5 | grep -v 'aria-hidden\|aria-label\|role="img"'
+
+# 4. Modals without dialog role
+echo "=== Checking modal semantics ==="
+grep -n 'role="dialog"' public/app/*.html public/app/*.js | head -10
+
+# 5. Form inputs without labels or aria-describedby
+echo "=== Checking form labels ==="
+grep -n '<select\|<input\|<textarea' public/app/crud-forms.js | grep -v 'aria-\|id="\|type="hidden"\|type="checkbox"' | head -10
+
+# 6. Line-height below 1.5
+echo "=== Checking line-height ==="
+grep -n 'line-height:\s*1[.;]\|line-height:\s*1$' public/app/spotify-theme.css public/app/styles.css | grep -v '1\.[5-9]\|font-size'
+```
+
+## Manual Checklist
+
+After automated checks pass, verify these:
+
+### Contrast (1.4.6 — AAA 7:1)
 
 **Approved text colour palette (all 7:1+ on #121212):**
-| Variable | Hex | Ratio |
-|----------|-----|-------|
-| `--spotify-text` | `#ffffff` | 18.1:1 |
-| `--spotify-text-subdued` | `#c8c8c8` | 11.2:1 |
-| `--spotify-text-secondary` | `#bfbfbf` | 10.2:1 |
-| `--spotify-text-muted` | `#a0a0a0` | 7.2:1 |
-| `--spotify-green-text` | `#4ade80` | 10.8:1 |
-| `--color-success` | `#34d399` | 9.7:1 |
-| `--color-warning` | `#fbbf24` | 11.2:1 |
 
-To verify a new colour, run:
+| Variable | Hex | Ratio | Usage |
+|----------|-----|-------|-------|
+| `--spotify-text` | `#ffffff` | 18.1:1 | Primary text |
+| `--spotify-text-subdued` | `#c8c8c8` | 11.2:1 | Secondary text |
+| `--spotify-text-secondary` | `#bfbfbf` | 10.2:1 | Tertiary text |
+| `--spotify-text-muted` | `#a0a0a0` | 7.2:1 | Muted text (minimum) |
+| `--spotify-green-text` | `#4ade80` | 10.8:1 | Green text, focus rings |
+| `--color-success` | `#34d399` | 9.7:1 | Success text |
+| `--color-warning` | `#fbbf24` | 11.2:1 | Warning text |
+| `--color-danger` | `#fca5a5` | 9.1:1 | Danger/error badges |
+| `--color-info` | `#a5b4fc` | 7.5:1 | Info/defer badges |
+| `--color-purple` | `#c4b5fd` | 8.2:1 | Purple badges |
+| `--color-blue` | `#93bbfd` | 7.8:1 | Blue badges |
+
+**Border contrast:** `--spotify-border: rgba(255,255,255,0.25)` gives ~3.2:1 on #121212. Never reduce below 0.25 opacity.
+
+To verify a new colour:
 ```bash
 python3 -c "
 def lum(h):
@@ -44,59 +74,59 @@ print(f'{(l1+0.05)/(l2+0.05):.2f}:1')
 "
 ```
 
-### 2. Target Size (2.5.5 — 44px minimum)
+### Target Size (2.5.5 — 44px)
 
-Every `<button>`, `[role="button"]`, `<a onclick>`, checkbox, radio must be at least 44x44px.
-
-- If adding inline-styled buttons with small padding, add `min-width: 44px; min-height: 44px;`
-- The global CSS rule (`spotify-theme.css`) sets `min-width/height: 44px` on buttons, but inline styles can override it
+- Every `<button>`, `[role="button"]`, checkbox, radio must be at least 44x44px
+- Global CSS handles this, but inline `width`/`height` can override — check new elements
 - Icon-only buttons MUST have `aria-label`
 
-### 3. Keyboard (2.1.3 — No Exception)
+### Keyboard (2.1.3)
 
-If you add a `<div onclick>` or `<span onclick>`:
-- Add `role="button" tabindex="0"`
-- Add `onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}"`
-- Or better: use a `<button>` element instead
+- **Never** use `<div onclick>` or `<span onclick>` — use `<button>` instead
+- All modals must have focus trapping (`_trapFocus`/`_releaseFocus`)
+- All modals must have `role="dialog"`, `aria-modal="true"`, `aria-labelledby`
 
-### 4. Line Height (1.4.8 — minimum 1.5)
+### Tab Semantics (4.1.2)
 
-- Body has `line-height: 1.5` globally
-- Never set `line-height` below 1.5 on text content
-- Exception: stat numbers, icon containers, and non-text elements can use tighter line-heights
+- Tab buttons need `role="tab"`, `aria-controls="<pane-id>"`, `aria-selected`
+- Tab panes need `role="tabpanel"`, `aria-labelledby="<button-id>"`
+- Tab button IDs are auto-assigned in `setupTabs()` as `<tab>TabBtn`
 
-### 5. Abbreviations (3.1.4)
+### Form Fields (3.3.5)
 
-On first use of abbreviations in new UI text, wrap with `<abbr title="Full Name">ABBR</abbr>`.
-Known abbreviations: MVP, BRD, AI, CSV, FAB, P1, P1.5, P2, BL, CRUD, API.
+- New form fields should have `<small>` helper text with unique `id`
+- Link with `aria-describedby` on the input/select/textarea
 
-### 6. Focus Visible (2.4.7)
+### Abbreviations (3.1.3)
 
-The global `:focus-visible` rule handles this. Don't add `outline: none` without a `:focus-visible` replacement.
+On first use in new UI text: `<abbr title="Full Name">ABBR</abbr>`
+Known: MVP, BRD, AI, CSV, P1, P1.5, P2, BL, CRUD, API, BPS, AOP
 
-### 7. Reduced Motion (2.3.3)
+### Error Prevention (3.3.6)
 
-- The `.anim-off` CSS class and `prefers-reduced-motion` media query suppress animations
-- Don't add animations that bypass these (no `!important` on animation-duration)
+- Destructive actions: use `await window.appConfirm('Title', 'message', { danger: true })`
+- Regular saves: CRUD forms already have undo via `showUndoNotification`
+- New bulk operations must confirm first
 
-### 8. Help Text (3.3.5)
+### Reduced Motion (2.3.3)
 
-New form fields should have `<small>` helper text or `aria-describedby` linking to a help element.
+- `.anim-off` class and `prefers-reduced-motion` suppress animations
+- Never use `!important` on `animation-duration` in regular CSS
 
-### 9. Error Prevention (3.3.6)
+### Notification Container
 
-Any new destructive action (delete, bulk update) must use `confirm()` or a confirmation modal.
+- Uses `aria-relevant="additions"` (not `aria-atomic="true"`)
+- Messages must be HTML-escaped before `innerHTML` insertion
 
-## Quick Verification
+## Known AAA Gaps (Documented)
 
-After changes, do a quick scan:
-```bash
-# Check for forbidden text colours
-grep -rn 'color.*#1db954\|color.*#10b981\|color.*#f59e0b' public/app/*.js public/app/*.html | grep -v 'background\|border\|accent\|stroke\|fill\|var(--spotify-green,'
+These AAA criteria are not fully met and are documented in the WCAG modal:
+- **3.1.5 Reading Level** — no simplified alternatives for complex content
+- **3.1.6 Pronunciation** — no pronunciation mechanism
+- **1.4.8 Visual Presentation** — partial (no user-customizable foreground/background colours)
 
-# Check for div/span onclick without keyboard
-grep -n 'div onclick\|span onclick' public/app/*.html public/app/*.js | grep -v 'role="button"'
+## When to Run
 
-# Check for line-height below 1.5 on text
-grep -n 'line-height: 1[.;]\|line-height: 1$' public/app/spotify-theme.css public/app/styles.css
-```
+- Before `firebase deploy --only hosting`
+- After modifying any file in `public/app/`
+- After adding new interactive elements, modals, or form fields
