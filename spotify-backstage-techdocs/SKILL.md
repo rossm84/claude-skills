@@ -169,11 +169,16 @@ gh api -X DELETE repos/community-platform/<repo>/git/refs/heads/main --hostname 
 ```
 
 ### Catalog import fails with "already registered but failing processing"
-**Cause:** Backstage has a stuck location record for that exact URL. Usually triggered by a repo rename that invalidates a prior registration, or by a failed initial registration that Backstage never retries cleanly.
+**Cause:** Backstage has a stuck location record in `sysmodel.spotify.net/v1/locations`. Underlying error visible in browser DevTools console is `409 Conflict` on that endpoint. Usually triggered by a repo rename that invalidates a prior registration, or by a failed initial registration that Backstage never retries cleanly.
+**Diagnostic signature:**
+- UI error mentions `tree/master/<file>.yaml` (invalid directory URL)
+- DevTools Network panel shows `sysmodel.spotify.net/v1/locations` returning `409 Conflict`
+- Every URL variant tried for the same repo hits the same error
 **Fix:** the URL is permanently blocked. Workarounds in order of preference:
 1. Use a different filename (e.g. rename `catalog.yaml` ↔ `catalog-info.yaml`) so the URL is novel
 2. Rename the repo to a name Backstage has never seen before
-3. Ask a Backstage admin in `#backstage` or `#tingle-users` to clear the stuck location
+3. **Ask a Backstage admin** in `#backstage` or `#tingle-users` to clear the stuck locations rows for the affected repo. This is the only real fix once the 409 is established — CLI-side changes cannot clear sysmodel state. Template message:
+   > `409 Conflict` on `sysmodel.spotify.net/v1/locations` when importing `<repo>/blob/master/catalog-info.yaml`. Multiple location records probably stuck from prior rename/failed attempts. Please clear any rows pointing at `community-platform/<repo>` (any path, any filename) so I can re-register.
 
 ### Build fails with mkdocs module errors
 **Cause:** `mkdocs.yml` has `pymdownx` extensions, material theme shortcodes (`:material-*:`, `grid cards`), or other extras not in techdocs-core.
