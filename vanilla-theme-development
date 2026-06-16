@@ -1,0 +1,216 @@
+---
+name: vanilla-theme-development
+description: Use when customising or building themes for Higher Logic Vanilla (community.spotify.com). Covers the asset-based theme system, variables.neon, Twig templates, CSS overrides, PHP hooks, and the deploy pipeline.
+---
+
+# Vanilla Theme Development
+
+## When to use
+- Building or modifying the Spotify community theme in `vanillaforums/spotify`
+- Creating new theme assets (header, footer, styles, variables)
+- Understanding how Vanilla's theme system works
+- Debugging theme rendering issues
+
+## Theme Architecture
+
+Vanilla has two theme generations. **Always use the modern "asset-based" approach** (DataDrivenTheme) for new work.
+
+### Modern Asset-Based Theme (recommended)
+
+Themes live in `themes/<theme-name>/` with this structure:
+
+```
+themes/<name>/
+  addon.json              # Theme manifest (key, name, features, assets)
+  package.json            # npm config for build tooling
+  <Name>ThemeHooks.php    # PHP hooks class (extends Gdn_Plugin)
+  README.md
+  assets/
+    header.twig           # Custom HTML above Vanilla's React header
+    footer.twig           # Custom footer HTML
+    styles.css            # Scoped CSS for header/footer only
+    variables.neon        # Design tokens (colours, fonts, spacing)
+  design/
+    custom.css            # Main CSS override file (applies globally)
+  js/
+    custom.js             # Client-side JavaScript
+  src/
+    scss/custom.scss      # SCSS source (compiled to design/custom.css)
+    scripts/
+      entries/forum.tsx   # Webpack/Vite entry point
+  views/
+    layout.default.twig   # Master page template
+    components/           # Twig partials
+    categories/           # Category view overrides (PHP)
+    discussions/          # Discussion list view overrides (PHP)
+    discussion/           # Single discussion view overrides (PHP)
+```
+
+### addon.json
+
+```json
+{
+  "key": "theme-name",
+  "name": "Theme Display Name",
+  "type": "theme",
+  "version": "1.0.0",
+  "hidden": false,
+  "mobileFriendly": true,
+  "Features": {
+    "DataDrivenTheme": true,
+    "SharedMasterView": true
+  },
+  "assets": {
+    "variables": "assets/variables.neon",
+    "header": "assets/header.twig",
+    "footer": "assets/footer.twig",
+    "styles": "assets/styles.css"
+  }
+}
+```
+
+Key fields:
+- `"DataDrivenTheme": true` — opts into React header/nav system
+- `"SharedMasterView": true` — uses the platform's shared master view
+- `"hidden": true` — hides from theme picker (used during development)
+- `assets` — declares which files are loaded as theme assets
+
+### variables.neon
+
+The token system that controls the entire theme appearance. Override only what you need; everything else falls back to defaults.
+
+```neon
+# Primary brand colours
+global:
+    mainColors:
+        primary: "#1DB954"       # Spotify green
+        bg: "#121212"            # Dark background
+        fg: "#FFFFFF"            # Light text
+    fonts:
+        forceGoogleFont: "Circular, Helvetica, Arial, sans-serif"
+    body:
+        backgroundImage:
+            color: "#121212"
+
+# Title bar / navigation
+titleBar:
+    colors:
+        bg: "#000000"
+        fg: "#FFFFFF"
+
+# Banner area
+banner:
+    colors:
+        primary: "#1DB954"
+        bg: "#191414"
+
+# Content tiles
+tiles:
+    options:
+        columns: 2
+```
+
+Common token paths: `global.mainColors`, `global.fonts`, `titleBar`, `banner`, `shadow`, `tiles`, `navigation`, `links`, `border`.
+
+### PHP Hooks (ThemeHooks.php)
+
+```php
+class MyThemeHooks extends Gdn_Plugin {
+    public function setup() {
+        // Runs on theme activation
+        saveToConfig('Garden.HomepageTitle', 'Spotify Community');
+    }
+
+    public function base_render_before($sender) {
+        // Fires on every page render — add assets, set metadata
+        $sender->addCssFile('custom.css', 'themes/my-theme/design');
+        $sender->addJsFile('custom.js', 'themes/my-theme/js');
+    }
+
+    public function discussionController_beforeDiscussionRender_handler($sender) {
+        // Fires before a single discussion renders
+        $sender->Head->addTag('meta', ['name' => 'threadid', 'content' => $sender->data('Discussion.DiscussionID')]);
+    }
+}
+```
+
+Common hook points:
+- `base_render_before` — every page (add CSS/JS, set metadata)
+- `discussionController_beforeDiscussionRender_handler` — single discussion page
+- `categoryController_beforeCategoriesRender_handler` — category listing
+- `categoriesController_beforeCategoriesRender_handler` — categories index
+
+### Twig Templates
+
+`layout.default.twig` is the master template. Key Twig variables:
+
+```twig
+{{ vanillaUrl }}              {# Base URL of the Vanilla site #}
+{{ cssUrl }}                  {# URL to the theme's CSS #}
+{{ heroImageUrl }}            {# Banner image URL #}
+{{ title }}                   {# Page title #}
+{{ locale }}                  {# Current locale code #}
+{{ isHomepage }}              {# Boolean: is this the homepage? #}
+{% block content %}           {# Main content block #}
+  {{ Content.render()|raw }}
+{% endblock %}
+```
+
+### Discussion/Comment PHP Views
+
+Legacy PHP view files override Vanilla's default rendering:
+- `writeComment($comment, $sender)` — renders a single comment/post
+- `writeDiscussionRow($discussion, $sender, $session)` — renders a discussion list row
+- `writeTableHead()` / `writeTableRow()` — table-based category listings
+
+These use `Gdn_Theme` helpers and `Gdn_Format::text()` / `Gdn_Format::to()` for content formatting.
+
+## Deploy Pipeline
+
+### deploy.json
+
+```json
+{
+  "production": {
+    "branch": "master",
+    "id": "6038735"
+  },
+  "staging": {
+    "branch": "stage",
+    "id": "6038846"
+  },
+  "development": {
+    "branch": "develop",
+    "id": "6038847"
+  }
+}
+```
+
+Deploy via Vanilla's "Theme Pull" button in the forum dashboard (Settings > Theme). Each branch maps to a site ID. No GitHub Actions or CI — deployment is manual pull from dashboard.
+
+### Branch strategy
+- `master` — production-ready code
+- `stage` — staging/QA
+- `develop` — active development
+- Feature branches: `feature/*` or `fix/*`, PR into `develop`
+
+## Current State (Spotify prod repo)
+
+The `vanillaforums/spotify` repo currently contains a **copy of codeploy.ie's theme** (Irish forum), NOT Spotify branding. Key things to replace:
+
+1. `variables.neon` — change primary from `#3b5586` to `#1DB954`
+2. `categories.twig` — replace 120KB hardcoded codeploy.ie category tree with Spotify's structure (or use dynamic rendering)
+3. `header.twig` / `footer.twig` — replace codeploy.ie nav with Spotify branding
+4. `CodeployThemeHooks.php` — remove codeploy.ie-specific logic (Talk-To sections, Bank of Ireland, GA UA tracking)
+5. `custom.css` (77KB) — strip codeploy.ie styles, build Spotify styles
+6. `custom.js` — remove codeploy.ie menu manager, build Spotify-specific JS
+7. Ad integration — remove Snigel ad engine (codeploy.ie monetisation)
+8. `layout.default.twig` — remove ad slots, GDPR consent flow (Spotify has its own)
+
+## Reference Widgets (from Spotify-trial)
+
+The `Spotify-trial` repo's `vanilla-preview` plugin has Spotify-specific widget examples:
+- `PersonalisedBannerWidget` — role-based CTAs (guest/member/Star), uses #1DB954
+- `SectionClassWidget` — injects CSS class onto layout sections
+- `PreviewBodyClassProvider` — URL-to-body-class mapping (stars-home, star-apply, leaderboard)
+- `spotify-custom-feed` plugin (feature/adam-demo branch) — personalised discussion feed using `interestWeights` profile field (skeleton only)

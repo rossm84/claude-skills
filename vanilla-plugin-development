@@ -1,0 +1,345 @@
+---
+name: vanilla-plugin-development
+description: Use when building plugins, widgets, or custom functionality for Higher Logic Vanilla. Covers the addon system, Layout Hydrator, React widgets, PHP hooks, API controllers, and the pockets system.
+---
+
+# Vanilla Plugin Development
+
+## When to use
+- Building custom plugins or widgets for Spotify's Vanilla community
+- Adding new React widgets to the Layout Editor
+- Creating custom API endpoints
+- Understanding Vanilla's addon/plugin architecture
+- Injecting custom HTML/JS via Pockets
+
+## Plugin Structure
+
+```
+plugins/<plugin-name>/
+  addon.json                           # Plugin manifest
+  <PluginName>Plugin.php               # Main plugin class (legacy) OR:
+  Addon/<PluginName>ContainerRules.php # DI container wiring (modern)
+  Controllers/
+    Api/<Name>ApiController.php        # REST API endpoints
+    <Name>Controller.php               # Page controllers
+  Library/
+    <WidgetName>.php                   # Widget classes
+  src/scripts/
+    entries/
+      forum.tsx                        # Forum-facing JS entry
+      admin-new.tsx                    # Admin layout editor entry
+      layouts.tsx                      # Layout widget registration
+    components/widgets/
+      <WidgetName>.tsx                 # React widget component
+      <WidgetName>.module.scss         # Scoped styles
+      <WidgetName>Preview.tsx          # Layout editor preview
+  locale/
+    en.php                             # English strings
+  tests/
+    <Name>Tests.php                    # PHPUnit tests
+  openapi/<name>.yml                   # OpenAPI spec (optional)
+```
+
+### addon.json
+
+```json
+{
+  "key": "my-spotify-plugin",
+  "name": "Spotify Custom Plugin",
+  "description": "Custom functionality for Spotify Community",
+  "version": "1.0.0",
+  "type": "addon",
+  "require": {
+    "vanilla": ">=2024.001"
+  },
+  "sites": ["6038735.vanillacommunities.com"],
+  "icon": "my-icon.svg",
+  "settingsUrl": "/settings/my-plugin",
+  "settingsRoute": "/settings/my-plugin"
+}
+```
+
+Key fields:
+- `sites` — restrict plugin to specific site domains (omit for all sites)
+- `require` — version constraints
+- `settingsUrl` — admin settings page URL
+
+## Widget Development (Layout Editor)
+
+The key pattern for adding visual components. Three pieces must match:
+
+### 1. PHP Widget Class
+
+```php
+<?php
+namespace Vanilla\MyPlugin;
+
+use Vanilla\Widgets\React\ReactWidgetInterface;
+use Vanilla\Layout\LayoutHydrator;
+
+class MyWidget implements ReactWidgetInterface {
+
+    public static function getComponentName(): string {
+        return "MyWidget";  // Must match JS component name exactly
+    }
+
+    public static function getWidgetIconPath(): string {
+        return "/plugins/my-plugin/design/my-icon.svg";
+    }
+
+    public static function getWidgetSchema(): Schema {
+        return Schema::parse([
+            "title:s?" => ["description" => "Widget title", "x-control" => SchemaForm::textBox()],
+            "maxItems:i?" => ["description" => "Max items", "default" => 5, "x-control" => SchemaForm::dropDown(
+                new FormOptions("Max Items"),
+                new StaticFormChoices(["3" => "3", "5" => "5", "10" => "10"])
+            )],
+        ]);
+    }
+
+    public static function getWidgetName(): string {
+        return "My Custom Widget";
+    }
+
+    public function getProps(): ?array {
+        return ["title" => "Default Title", "maxItems" => 5];
+    }
+}
+```
+
+### 2. Container Rules (register with Layout Hydrator)
+
+```php
+<?php
+namespace Vanilla\MyPlugin\Addon;
+
+use Garden\Container\ContainerConfigurationInterface;
+use Vanilla\Layout\LayoutHydrator;
+
+class MyPluginContainerRules {
+    public function configureContainer(ContainerConfigurationInterface $container): void {
+        $container->rule(LayoutHydrator::class)
+            ->addCall("addReactResolver", [MyWidget::class]);
+    }
+}
+```
+
+### 3. TypeScript Widget Component
+
+**entries/layouts.tsx** (widget registration):
+```tsx
+import { registerLoadableWidgets } from "@library/utility/componentRegistry";
+
+registerLoadableWidgets({
+    MyWidget: () => import("../components/widgets/MyWidget"),
+});
+```
+
+**entries/admin-new.tsx** (layout editor preview):
+```tsx
+import { registerWidgetOverviews } from "@dashboard/layout/editor/widgetSettings/WidgetSettingsModal";
+import MyWidgetPreview from "../components/widgets/MyWidgetPreview";
+
+registerWidgetOverviews({
+    MyWidget: MyWidgetPreview,
+});
+```
+
+**components/widgets/MyWidget.tsx**:
+```tsx
+import React from "react";
+
+interface IMyWidgetProps {
+    title?: string;
+    maxItems?: number;
+}
+
+export default function MyWidget(props: IMyWidgetProps) {
+    const { title = "Default", maxItems = 5 } = props;
+    return (
+        <div className="myWidget">
+            <h2>{title}</h2>
+            {/* Widget content */}
+        </div>
+    );
+}
+```
+
+**The component name string must be identical** in `getComponentName()`, `registerLoadableWidgets`, and `registerWidgetOverviews`.
+
+## API Controllers
+
+```php
+<?php
+namespace Vanilla\MyPlugin\Controllers\Api;
+
+use AbstractApiController;
+use Garden\Schema\Schema;
+use Garden\Web\Data;
+
+class MyApiController extends AbstractApiController {
+
+    // GET /api/v2/my-endpoint
+    public function index(array $query): Data {
+        $this->permission(); // No specific permission = any authenticated user
+        $in = $this->schema(Schema::parse(["limit:i?" => ["default" => 10]]), "in");
+        $query = $in->validate($query);
+
+        return new Data(["items" => []], ["paging" => ["totalCount" => 0]]);
+    }
+
+    // GET /api/v2/my-endpoint/:id
+    public function get(int $id): Data {
+        $this->permission("site.manage"); // Requires admin
+        return new Data(["id" => $id]);
+    }
+
+    // POST /api/v2/my-endpoint
+    public function post(array $body): Data {
+        $this->permission("myPlugin.manage");
+        $in = $this->schema(Schema::parse(["name:s", "value:s?"]), "in");
+        $body = $in->validate($body);
+
+        return new Data($body, 201);
+    }
+}
+```
+
+Schema validation uses `garden-schema`. The controller name minus "ApiController" becomes the URL path (e.g., `MyApiController` -> `/api/v2/my`).
+
+## PHP Event Hooks (Legacy Pattern)
+
+```php
+class MyPlugin extends Gdn_Plugin {
+    // Fires before every page render
+    public function base_render_before($sender) {
+        $sender->addJsFile('custom.js', 'plugins/my-plugin/js');
+    }
+
+    // Fires when a discussion is saved
+    public function discussionModel_afterSaveDiscussion_handler($sender, $args) {
+        $discussionID = $args['DiscussionID'];
+        // Custom logic
+    }
+
+    // Fires when viewing a category
+    public function categoriesController_render_before($sender) {
+        $categoryID = $sender->data('Category.CategoryID');
+    }
+
+    // Plugin setup (activation)
+    public function setup() {
+        // Run on first enable
+    }
+
+    // Plugin structure (runs on every config change)
+    public function structure() {
+        // Create/alter DB tables
+        Gdn::structure()
+            ->table('MyTable')
+            ->column('MyTableID', 'int', false, 'primary')
+            ->column('Name', 'varchar(100)')
+            ->set();
+    }
+}
+```
+
+## Pockets (No-Code HTML Injection)
+
+The Pockets plugin lets admins inject HTML/JS into named slots without writing a plugin. Access via dashboard Settings > Pockets.
+
+Available locations:
+- `Head` — inside `<head>` (for meta tags, tracking scripts)
+- `Content` — before/after main content
+- `Panel` — sidebar slots
+- `Foot` — before `</body>`
+- `BetweenDiscussions` — between discussion list rows
+- `BetweenComments` — between comment rows
+
+Good for: analytics tags, promotional banners, cookie consent, custom CSS injection.
+
+## Widget Fragments (Extending Core Widgets)
+
+Fragments let you extend existing core widgets without replacing them:
+
+```php
+class MyFragmentMeta extends SiteTotalsFragmentMeta {
+    public function getFragmentKey(): string {
+        return "myFragment";
+    }
+
+    public static function getSchema(): Schema {
+        return Schema::parse([
+            "callToActionText:s?" => ["default" => "Join Now"],
+        ]);
+    }
+}
+```
+
+```tsx
+// Injectable interface
+export interface IMyFragment {
+    callToActionText?: string;
+}
+
+// Template component
+export function MyFragment(props: IMyFragment) {
+    return <a href="/register">{props.callToActionText ?? "Join Now"}</a>;
+}
+```
+
+## SSO Integration
+
+Two main SSO plugins included in vanilla-local:
+
+### jsconnect (Vanilla's native SSO)
+- JWT-based, supports cross-domain
+- Partner implements a jsconnect endpoint that returns user data
+- Config: `$Configuration['Plugins']['jsconnect']`
+
+### OAuth2
+- Generic OAuth2 flow
+- Config: client ID, secret, authorize URL, token URL, profile URL
+- Plugin key: `oauth2`
+
+## Build & Test
+
+```bash
+# Frontend build (from theme or plugin root)
+yarn install && yarn build
+
+# PHP tests
+vendor/bin/phpunit tests/
+
+# JS tests
+yarn test:unit    # Vitest
+
+# Dev with hot reload
+# Set $Configuration['HotReload']['Enabled'] = true in config
+yarn build:dev
+```
+
+## Key Patterns from Spotify-trial
+
+### Personalised Banner (role-based CTA)
+Shows different content based on user role:
+- Guest: "Become a Star" CTA
+- Member: "Apply Now" CTA
+- Star role: "Visit the Backstage" CTA
+Uses `useCurrentUserSignedIn()` and role checking from Vanilla's React hooks.
+
+### Section Class Widget (CSS injection)
+Zero-height widget that injects a CSS class onto its parent layout section DOM node. Enables per-section theming via CSS without writing section-specific widgets.
+
+### Body Class Provider (URL-based theming)
+Maps URL paths to body CSS classes, supporting subcommunity prefixes:
+```tsx
+const PAGE_CLASS_MAP: Record<string, string> = {
+    "stars-home": "page-stars-home",
+    "star-apply": "page-star-apply",
+    "leaderboard": "page-leaderboard",
+};
+```
+
+### Personalised Feed (interest weighting)
+Discussion list widget that reads `interestWeights` from user profile fields and applies as sort weighting. Hooks into `/api/v2/discussions` index schema to add `?spotifyFeed=true` filter. Currently a stub/POC.

@@ -1,0 +1,178 @@
+---
+name: vanilla-repo-guide
+description: Use when navigating the vanillaforums GitHub repos, understanding Vanilla platform architecture, or looking up how specific Vanilla subsystems work. Reference guide for the codebase structure.
+---
+
+# Vanilla Forums Repository Guide
+
+## When to use
+- Navigating the vanillaforums GitHub org repos
+- Understanding Vanilla's platform architecture
+- Looking up how a specific Vanilla subsystem works
+- Finding reference code for building custom themes or plugins
+
+## Repository Map
+
+| Repo | Use for | Branch |
+|------|---------|--------|
+| `vanillaforums/spotify` | Production Spotify theme work | `master` (prod), `stage`, `develop` |
+| `vanillaforums/Spotify-trial` | Spotify-specific widget examples (Stars programme, personalised feed) | `master`, `feature/adam-demo` |
+| `vanillaforums/vanilla-local` | Platform architecture reference, understanding how Vanilla works | `release/2026.002` |
+| `vanillaforums/community` | Irrelevant (Vanilla's own support site theme) | `master` |
+
+## Accessing Repo Content
+
+```bash
+# List repos
+gh api orgs/vanillaforums/repos --jq '.[].name'
+
+# Get file tree
+gh api repos/vanillaforums/<repo>/git/trees/<branch>?recursive=1 --jq '.tree[].path'
+
+# Read a file (base64-decode)
+gh api repos/vanillaforums/<repo>/contents/<path> --jq '.content' | base64 -d
+
+# Recent commits
+gh api repos/vanillaforums/<repo>/commits?per_page=20
+
+# Branches
+gh api repos/vanillaforums/<repo>/branches
+
+# PRs
+gh api repos/vanillaforums/<repo>/pulls?state=all
+```
+
+## vanilla-local Architecture (The Platform)
+
+This is the reference for understanding how Vanilla works. Key directories:
+
+```
+vanilla-local/
+├── applications/
+│   ├── dashboard/      # Admin backend (settings, users, roles, permissions)
+│   ├── vanilla/        # Core forum (discussions, categories, comments)
+│   ├── conversations/  # Private messaging
+│   └── groups/         # Sub-communities / groups
+├── library/
+│   ├── Garden/         # Core framework (HTTP, events, DI, exceptions)
+│   └── Vanilla/
+│       ├── Layout/     # Layout Editor + Hydrator (widget rendering system)
+│       ├── Theme/      # ThemeService, theme providers, variable resolution
+│       ├── Models/     # Base model classes
+│       └── Widgets/    # Widget base classes and interfaces
+├── plugins/            # 37 bundled plugins (see below)
+├── addons/themes/      # Reference themes
+│   ├── theme-foundation/   # Modern asset-based theme (THE template to follow)
+│   ├── theme-boilerplate/  # Legacy SCSS starter
+│   ├── lavendermoon/       # Dark theme example
+│   └── lavendersun/        # Light theme example
+├── build/              # Vite/webpack config, Storybook
+├── cli/                # `vnla` CLI tool
+├── docker/             # Dev environment containers
+├── docs/               # Backend + frontend architecture docs
+├── packages/           # Internal npm packages (vanilla-ui, vanilla-i18n)
+└── tests/              # PHPUnit + Vitest
+```
+
+## Key Subsystems
+
+### Layout Editor + Hydrator
+- `library/Vanilla/Layout/LayoutHydrator.php` — server-side widget resolution
+- `GET /api/v2/layouts/lookup-hydrate` — hydrates layout specs into React trees
+- Admins drag widgets onto pages in the Layout Editor
+- Widgets register via `addReactResolver` in container rules
+
+### Theme System
+- `library/Vanilla/Theme/ThemeService.php` — manages theme providers
+- Supports theme inheritance (max 3 levels)
+- Mobile vs desktop theme separation
+- `DataDrivenTheme` feature flag enables modern React header
+
+### Addon System
+- Everything is an addon: applications, plugins, themes
+- `addon.json` manifest required for each
+- Enabled via `$Configuration['EnabledPlugins']` or `$Configuration['EnabledApplications']`
+
+### Event System
+- Convention-based: `controllerName_eventName_handler`
+- `base_render_before` fires on every page
+- Models emit `afterSave`, `beforeDelete`, etc.
+
+## Bundled Plugins (Key Ones)
+
+| Plugin | What it does |
+|--------|-------------|
+| `rich-editor` | WYSIWYG editor (Quill-based, default) |
+| `QnA` | Q&A with accepted answers |
+| `ideation` | Idea voting on discussions |
+| `oauth2` | Generic OAuth2 SSO |
+| `jsconnect` | Vanilla's native SSO (JWT, cross-domain) |
+| `pockets` | Inject HTML into named slots (no code needed) |
+| `ProfileExtender` | Custom profile fields |
+| `Flagging` | User content reporting |
+| `SplitMerge` | Mod tools: split/merge discussions |
+| `Sitemaps` | XML sitemaps |
+| `swagger-ui` | Interactive API explorer |
+| `Multilingual` | Multi-language support |
+| `CivilTongueEx` | Word filter/replacement |
+| `Akismet` | Spam filtering |
+| `StopForumSpam` | IP/email spam database |
+
+## Config System
+
+```php
+// conf/config.php (site-specific, NOT config-defaults.php)
+$Configuration['Garden']['CurrentTheme'] = 'spotify';
+$Configuration['themeFeatures']['DataDrivenTheme'] = true;
+$Configuration['Garden']['HomepageTitle'] = 'Spotify Community';
+$Configuration['Garden']['Authenticator']['DefaultScheme'] = 'oauth2';
+$Configuration['EnabledPlugins']['QnA'] = true;
+$Configuration['EnabledPlugins']['ideation'] = true;
+$Configuration['Feature']['CustomLayouts']['home'] = true;
+$Configuration['HotReload']['Enabled'] = true;  // Dev only
+```
+
+## Dev Environment
+
+```bash
+# Clone and set up
+git clone <vanilla-local>
+cd vanilla-local
+
+# Docker dev environment
+docker compose up -d
+
+# Install deps
+composer install
+yarn install
+
+# Create a local site
+./cli/bin/vnla spawn-site
+
+# Build frontend
+yarn build       # Production
+yarn build:dev   # Dev with HMR
+
+# Run tests
+vendor/bin/phpunit
+yarn test:unit
+```
+
+Dev site accessible at `https://vanilla.local/<sitename>`.
+
+## Site IDs (Spotify)
+
+| Environment | Site ID | Domain |
+|-------------|---------|--------|
+| Production | 6038735 | 6038735.vanillacommunities.com |
+| Staging | 6038846 | 6038846.vanillacommunities.com |
+| Development | 6038847 | 6038847.vanillacommunities.com |
+| Trial (old) | 6038267 | spotify-trial.vanillacommunity.com |
+
+## Deploy Process
+
+No CI/CD. Deploy via Vanilla's "Theme Pull" in forum dashboard:
+1. Push code to the appropriate branch (`master`/`stage`/`develop`)
+2. Go to dashboard Settings > Theme
+3. Click "Theme Pull" to deploy from GitHub
+4. `deploy.json` maps branches to site IDs
