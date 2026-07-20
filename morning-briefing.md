@@ -21,7 +21,15 @@ Also check for yesterday's briefing at `/tmp/morning-briefing-{YYYY-MM-DD}.log` 
 Use `mcp__claude_ai_Spotify_s_Enterprise_Context_Agent__search_workplace_knowledge` with `gmail_query: "newer_than:1d"`.
 
 ### 1b. Calendar (today)
-Use the same tool with `calendar_filters` for today's full date range (00:00 to 23:59 UTC).
+Use this approach in order:
+
+1. **Primary:** ECA with `calendar_filters` for today (timeMin: 00:00Z, timeMax: 23:59Z). This is the cleanest source but is currently unreliable.
+
+2. **Fallback:** Search Gmail for `from:calendar-notification@google.com subject:"agenda" newer_than:1d` to find Google's "Daily Agenda" email. This only includes calendars Ross has enabled daily agendas for. Parse event titles, times, and calendar names from the email body.
+
+3. **Supplement:** Search Gmail for recent calendar invite emails: `from:calendar-notification@google.com subject:"Invitation" newer_than:3d` to catch any timed meetings that might not appear in the daily agenda.
+
+NOTE: If the daily agenda only shows the Community Content Calendar, remind Ross to enable daily agenda for his primary calendar: Google Calendar > Settings > rossmiller@spotify.com > Other notifications > Daily agenda > Email.
 
 ### 1c. Slack channels
 Use `mcp__claude_ai_Slack_MCP__slack_search_public_and_private` to find recent mentions and DM activity. Also check these watchlist channels for new activity:
