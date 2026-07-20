@@ -13,6 +13,8 @@ Before running, check if the file `/tmp/morning-briefing-{YYYY-MM-DD}.done` exis
 
 If the file does not exist, proceed with the briefing. After producing the output, create the marker file: `touch /tmp/morning-briefing-{YYYY-MM-DD}.done`
 
+Also check for yesterday's briefing at `/tmp/morning-briefing-{YYYY-MM-DD}.log` (yesterday's date) to identify carry-over items.
+
 ## Step 1: Gather Data (run all in parallel where possible)
 
 ### 1a. Email (last 24 hours)
@@ -21,8 +23,11 @@ Use `mcp__claude_ai_Spotify_s_Enterprise_Context_Agent__search_workplace_knowled
 ### 1b. Calendar (today)
 Use the same tool with `calendar_filters` for today's full date range (00:00 to 23:59 UTC).
 
-### 1c. Slack
-Use `mcp__claude_ai_Slack_MCP__slack_search_public_and_private` to find recent mentions and DM activity.
+### 1c. Slack channels
+Use `mcp__claude_ai_Slack_MCP__slack_search_public_and_private` to find recent mentions and DM activity. Also check these watchlist channels for new activity:
+- #community-migration
+- #cloud-network-users (DNS/infra)
+- #p-cs-ai-community
 
 ### 1d. Jira
 Use `mcp__claude_ai_Atlassian_Rovo__searchJiraIssuesUsingJql` with:
@@ -34,19 +39,24 @@ Use `mcp__claude_ai_Atlassian_Rovo__searchJiraIssuesUsingJql` with:
 ### 1e. The Porch
 Use `mcp__claude-board__board_home` then `mcp__claude-board__board_dm_read` for unread conversations.
 
-## Step 2: Classify Emails
+## Step 2: Process Emails
 
-### Auto-suppress (NOISE, exclude from briefing entirely):
+### 2a. Group by thread
+Emails sharing a threadId are one conversation. Show only the latest message per thread, with a count if >1.
+
+### 2b. Auto-suppress (NOISE, exclude entirely):
 - Community Mailer / Khoros board notifications
-- Mail Delivery Subsystem / bounced emails (flag separately if >2 bounces)
 - Workday / myworkday@spotify.com
 - Tingle Feedback / GHE build notifications
-- JIRA notification emails (the data comes from Step 1d instead)
+- JIRA notification emails (data comes from Step 1d)
 - GitHub notification emails
-- Google Calendar invites (the data comes from Step 1b instead)
+- Google Calendar invites (data comes from Step 1b)
 - Newsletters, noreply senders, marketing
 
-### Classify remaining emails:
+### 2c. Bounce detection
+If >1 "Mail Delivery Subsystem" / "Returned mail" message, collapse them into a single alert: "X emails bouncing. Check if [group/address] has stale members." Do not list each bounce.
+
+### 2d. Classify remaining emails:
 | Category | Definition |
 |----------|-----------|
 | **URGENT** | Real person waiting on Ross. Direct question, approval, deadline today, legal/compliance. |
@@ -58,6 +68,7 @@ Rules:
 - HLV/migration emails (Shannon, Melody, Jamie, Eng Wei, Joshua, Patrick): weight toward ACTION
 - Legal emails (Ruth Wong, ODPO): weight toward URGENT
 - Manager emails (Mark Ramirez): weight toward ACTION/URGENT
+- Use Gmail labels as signals: STARRED = boost priority, IMPORTANT = mild boost
 
 ## Step 3: Cross-Reference Calendar with Email + Slack + Jira
 
@@ -66,6 +77,8 @@ For each meeting today:
 2. Find Slack threads related to meeting topic or attendees
 3. Find Jira tickets relevant to the meeting topic
 4. Attach this context underneath the calendar entry
+
+If a meeting is within the next 2 hours, add a PREP tag and pull deeper context: linked docs, last meeting notes thread, open action items for attendees.
 
 ## Step 4: Compose Briefing
 
@@ -87,19 +100,26 @@ suggested action. Omit section if none.)
 
 TODAY'S SCHEDULE
 (chronological meetings with attendee context. If no meetings, say
-"Clear day" and move on.)
+"Clear day" and move on. Tag meetings in next 2h with [PREP].)
 
 ---
 
 EMAILS NEEDING REPLY
-(URGENT first, then ACTION. Each: sender, what they need, suggested
-reply approach. If none, say "Inbox clear.")
+(URGENT first, then ACTION. Group by thread. For each: sender, what
+they need, and a DRAFT one-line reply Ross can approve and send via
+ECA send_mail. If none, say "Inbox clear.")
+
+Example format:
+  URGENT: Ruth Wong - Taiwan complaint, needs CS records check
+  Draft reply: "Thanks Ruth, looping in T3 escalations. Will confirm
+  records by EOD."
+  -> Say "send 1" to send this reply
 
 ---
 
 SLACK + PORCH
-(DMs needing response, threads with new replies, channel highlights.
-If nothing, say "Nothing urgent.")
+(DMs needing response, threads with new replies, watchlist channel
+highlights. If nothing, say "Nothing urgent.")
 
 ---
 
@@ -109,15 +129,35 @@ Group: In Progress first, then blockers, then newly assigned.)
 
 ---
 
+INFRASTRUCTURE
+(Bounced emails, failed builds, DNS issues. Omit if clean.)
+
+---
+
+CARRY-OVER
+(Items from yesterday's briefing that are still unresolved. Read
+yesterday's log file to identify these. Omit on first run or if
+yesterday's log doesn't exist.)
+
+---
+
 DO FIRST: {the single thing to do before anything else}
+SEND BEFORE LUNCH: {the one reply to prioritise}
 ```
+
+## Step 5: Save and Offer Actions
+
+After displaying the briefing:
+1. Save the full briefing text to `/tmp/morning-briefing-{YYYY-MM-DD}.log`
+2. Number the draft replies (1, 2, 3...)
+3. Tell Ross: "Say 'send N' to send a draft reply, or 'brief details N' for more context on any item."
 
 ## Rules
 
 - Never get the day of the week wrong. Derive it from the actual date, do not guess.
 - Never fabricate names, email addresses, meeting details, or ticket numbers.
 - If a data source is unavailable or errors, note it and continue with the others.
-- Keep the entire briefing under 600 words. Ruthlessly cut noise.
+- Keep the entire briefing under 700 words. Ruthlessly cut noise.
 - Use plain text, no emojis.
 - Direct and professional. No filler.
 - Omit empty sections entirely rather than showing "None."
