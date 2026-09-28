@@ -38,7 +38,7 @@ Use `mcp__claude_ai_Slack_MCP__slack_search_public_and_private` to find recent m
 - #p-cs-ai-community
 
 ### 1d. Jira
-Use `mcp__claude_ai_Atlassian_Rovo__searchJiraIssuesUsingJql` with:
+Use `mcp__claude_ai_Atlassian_MCP__searchJiraIssuesUsingJql` with:
 - cloudId: `dc26f8aa-beba-4ac1-b55d-2f47ce01551f`
 - JQL: `project = CPM AND assignee = currentUser() AND status != Done ORDER BY updated DESC`
 - fields: summary, status, priority, updated, duedate

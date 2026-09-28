@@ -26,7 +26,7 @@ Read Ross's last message and the other party's most recent. Figure out:
 
 Do NOT dump context for context's sake. Pull only what's necessary to answer the ask correctly. Common sources:
 
-- **Jira**: `mcp__claude_ai_Atlassian_Rovo__searchJiraIssuesUsingJql` or `getJiraIssue`. Ross's board is `CPM` (cloudId `dc26f8aa-beba-4ac1-b55d-2f47ce01551f`).
+- **Jira**: `mcp__claude_ai_Atlassian_MCP__searchJiraIssuesUsingJql` or `getJiraIssue`. Ross's board is `CPM` (cloudId `dc26f8aa-beba-4ac1-b55d-2f47ce01551f`).
 - **Confluence**: `searchConfluenceUsingCql` for existing docs in space `CSPl`.
 - **Google Drive**: `mcp__claude_ai_GDrive_MCP__get_document_preview` or `get_document_structure`.
 - **Bandmanager**: `mcp__claude_ai_Bandmanager_MCP__*` for people/group lookups.
