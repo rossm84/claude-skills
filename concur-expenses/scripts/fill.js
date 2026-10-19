@@ -6,6 +6,38 @@ const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const b = await connect();
   const p = b.contexts()[0].pages().find(p => p.url().includes('concursolutions'));
   await p.bringToFront(); await p.keyboard.press('Escape');
+  // Itemise mode: run from the expense's Itemisations tab or an open itemisation.
+  // spec: {mode:"itemize", expect:"1,335.96", edit:[{n,date,amount,comment}], add:[{type,date,amount,comment}]}
+  if (spec.mode === 'itemize') {
+    const body = async () => p.innerText('body');
+    if (!(await body()).includes(spec.expect)) { console.log('ABORT: parent amount not on page'); process.exit(1); }
+    const fillItem = async (it) => {
+      if (it.type) {
+        const cb = p.locator('[role=combobox]').first();
+        await cb.click(); await p.waitForTimeout(600); await cb.fill(it.type).catch(() => p.keyboard.type(it.type)); await p.waitForTimeout(1500);
+        await p.getByRole('option', { name: new RegExp('^' + esc(it.type)) }).first().click(); await p.waitForTimeout(2000);
+      }
+      const di = p.locator('input[id^=transactionDate]'); await di.fill(it.date); await di.press('Tab');
+      const am = p.getByRole('textbox', { name: 'Amount', exact: true }); await am.fill(it.amount); await am.press('Tab');
+      if (it.comment) await p.locator('textarea#comment').fill(it.comment);
+      await p.getByRole('button', { name: /^Save Itemi[sz]ation/ }).first().click(); await p.waitForTimeout(4000);
+      const d = p.locator('[role=alertdialog]'); if (await d.count()) { console.log('DIALOG', (await d.innerText()).replace(/\s+/g, ' ')); await d.getByRole('button').last().click(); await p.waitForTimeout(1500); }
+      const m = (await body()).match(/Itemised\s*€\s*[\d,.]+[\s\S]{0,40}Remaining\s*€\s*[\d,.]+/); console.log('  saved', it.date, it.amount, '|', m ? m[0].replace(/\s+/g, ' ') : '');
+    };
+    const openItem = async (n) => {
+      if (!(await p.getByRole('button', { name: /^Save Itemi[sz]ation/ }).count()) || !(await body()).includes(`${n} of `)) {
+        if (!(await body()).includes('Add Itemisation')) { await p.getByRole('button', { name: 'Itemisations' }).first().click().catch(() => p.getByText('Itemisations', { exact: true }).first().click()); await p.waitForTimeout(2500); }
+        await p.getByText('Hotel Room Rate', { exact: true }).nth(n - 1).click(); await p.waitForTimeout(3000);
+      }
+    };
+    for (const it of spec.edit || []) { await openItem(it.n); console.log('EDIT', it.n, (await body()).match(/\d+ of \d+/)?.[0]); await fillItem(it); }
+    for (const it of spec.add || []) {
+      if (!(await body()).includes('Add Itemisation')) { await p.getByText('Expense', { exact: true }).first().click().catch(() => {}); await p.waitForTimeout(2500); }
+      await p.getByRole('button', { name: 'Add Itemisation' }).click(); await p.waitForTimeout(3000);
+      console.log('ADD', it.type); await fillItem(it);
+    }
+    await p.screenshot({ path: 'itemize-result.png' }); process.exit(0);
+  }
   if (!(await p.innerText('body')).includes('Viewing expense')) {
     const row = p.locator('[role=row]').filter({ hasText: 'Select expense' }).nth(spec.idx-1);
     await row.locator('[role=gridcell],[role=cell],td').nth(6).click(); await p.waitForTimeout(4000);

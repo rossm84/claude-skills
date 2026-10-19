@@ -54,6 +54,22 @@ Ross's permission rule allows exactly: `node <skill>/scripts/fill.js <spec.json>
 - **Receipt images can't be removed once merged into a multi-page receipt**, and some lines show no Remove button at all. Get the files right first time. Run **one line per call** and check the result before the next. The auto-mode classifier blocks batch saves and edits to the script's capabilities.
 - After a type change Concur may say "saved but missing information" (e.g. attendees). That's expected.
 
+### Hotel itemisation (fill.js itemize mode)
+From the hotel's Itemisations tab (Ross or the wizard creates N "Hotel Room Rate" rows first):
+```json
+{"mode":"itemize","expect":"1,335.96",
+ "edit":[{"n":1,"date":"10/04/2026","amount":"186.77","comment":"Night of 4 Oct: room + VAT + supplement"}],
+ "add":[{"type":"Room Tax","date":"10/09/2026","amount":"8.35","comment":"City tax 5 x 1.67"}]}
+```
+Use one Hotel Room Rate per night (room + VAT + per-night supplements) and put city tax under Room Tax. Types available: Hotel Room Rate, Room Tax, Travel Meals, Business Meals, Parking, Laundry, Miscellaneous. The script prints Itemised/Remaining after each save; aim for Remaining € 0.00.
+
+### Speed lessons (Oct 2026 Bulgaria claim)
+- Ask every question in one message up front: trip purpose, who was at each meal (name, title, company), taxi destinations, missing receipts, titles.
+- **Merge multiple photos into one image or PDF before uploading.** Multiple uploads trigger an async confirm dialog and caused duplicate pages and a stray slip on the wrong line, which can't be removed.
+- Keep Concur in full-screen view (not split) and ask Ross not to click while a script runs.
+- Ross can send receipts as real attachments, or forward them to receipts@expensit.com so Concur attaches them itself.
+- Run fill.js via the skill path: `node ~/.claude/skills/concur-expenses/scripts/fill.js /abs/spec.json` (scripts/package.json forces CommonJS).
+
 ## 6. Manual steps for Ross (the script can't do these)
 - **Attendees**: Attendees button → Advanced Options → new attendee (Business Guest: name, title, company) → Save. Someone with a spotify.com contractor account can still be external.
 - **Hotel itemisation** when nightly rates vary: give him a per-night table (room incl. VAT / supplements / city tax) that sums to the total.
