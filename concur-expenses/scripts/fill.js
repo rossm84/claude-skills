@@ -70,7 +70,7 @@ const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
   if (spec.receiptStatus) {
     const cbs = p.locator('[role=combobox]'); const n = await cbs.count();
-    for (let i=0;i<n;i++) { const v = await cbs.nth(i).inputValue().catch(()=> ''); if (/^(Tax Receipt|Receipt|No Receipt|None Selected)$/.test(v)) { await cbs.nth(i).click(); await p.waitForTimeout(600); await p.getByRole('option', { name: spec.receiptStatus, exact: true }).click(); break; } }
+    for (let i=0;i<n;i++) { const v = (await cbs.nth(i).inputValue().catch(()=> cbs.nth(i).innerText())).trim(); if (/^(Tax Receipt|Receipt|No Receipt|None Selected)$/.test(v)) { await cbs.nth(i).click(); await p.waitForTimeout(600); await p.getByRole('option', { name: spec.receiptStatus, exact: true }).click(); break; } }
   }
   await p.locator('textarea#comment').fill(spec.comment);
   for (const f of spec.files || []) {
