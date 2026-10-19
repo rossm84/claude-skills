@@ -118,23 +118,21 @@ this skill. Wrap-up is standalone and does not require
 
 **Critical rules (apply to all three paths):** `fileId` is an opaque
 token passed only to MCP tools (never to `Read`, never displayed).
-Fetch each document using exactly 2 MCP calls: `get_document_structure`
-(read `totalSections`) → mechanically build section IDs `section-0`
-through `section-(N-1)` → `get_document_section`. Process one document
-at a time (fetch → extract → sync log → next).
+Fetch each document with one `execute_tool` call on `user-gws-mcp`:
+name `gdocs.get_document`, args `document_id`. If that fails,
+`gdrive.read_file` with `file_id`. Process one document at a time
+(fetch → extract → sync log → next).
 
 1. Read `notes/meetings/_sync-log.json` and
    `notes/meetings/_sync-ignore.json` if they exist. Merge all `"id"`
    values into a single **skip-set**. (If neither file exists, treat the
    skip-set as empty — first run.)
-2. Call `list_drive_files` on your Drive MCP server (default
-   `user-google-drive-mcp`) with
-   `{ "query": "- Notes by Gemini", "maxResults": 100 }`.
-3. Filter: `mime_type` = `application/vnd.google-apps.document`, `name`
-   ends with `- Notes by Gemini`, matches regex
+2. Call `execute_tool` name `gdrive.search_files` on `user-gws-mcp`
+   with `{ "query": "Notes by Gemini", "file_type": "document", "max_results": 100 }`.
+3. Filter (also search `"[Notes Only]"` and accept titles `[Notes Only] <meeting> - YYYY/MM/DD HH:MM TZ`, skipping `[Transcript Only]`; Gemini's new format since Oct 2026): `name` ends with `- Notes by Gemini`, matches regex
    `/.+ - \d{4}\/\d{2}\/\d{2} .+ - Notes by Gemini$/`, `id` NOT in
    skip-set. Sort by date descending, cap at 5.
-4. For each new meeting document: fetch content (2 MCP calls per doc),
+4. For each new meeting document: fetch with `gdocs.get_document`,
    extract a one-sentence summary + any decisions/action items/status
    changes, update `notes/meetings/_sync-log.json` immediately after
    each document (create the file with
@@ -149,14 +147,14 @@ If 0 new meeting notes found: log "No new meeting notes" and continue.
 Regardless of which path above ran, also check for Google Docs or
 Sheets recently shared with or modified by others today.
 
-1. Call `list_drive_files` with `{ "query": "", "maxResults": 100 }`.
-2. Filter: `mime_type` is `document` or `spreadsheet`; `modifiedTime`
-   date matches today; `name` does NOT end with `- Notes by Gemini`;
-   `id` NOT in the skip-set or the `"shared_docs"` array in
-   `_sync-log.json`.
-3. Cap at 5, sort by `modifiedTime` descending.
-4. For each: call `get_drive_file_metadata` for owner info, then fetch
-   first 5 sections (or use `get_drive_file_content` for Sheets).
+1. Call `execute_tool` name `gdrive.search_files` on `user-gws-mcp`
+   with `{ "query": "", "modified_after": "<today>", "max_results": 20 }`.
+2. Filter: type is document or spreadsheet; `name` does NOT end with
+   `- Notes by Gemini`; `id` NOT in the skip-set or the `"shared_docs"`
+   array in `_sync-log.json`.
+3. Cap at 5, sort by modified time descending.
+4. For each: `gdrive.get_file` (`file_id`) for owner, then
+   `gdocs.get_document` for Docs or `gdrive.read_file` for Sheets.
    Extract: title, owner, 1-2 sentence summary, and whether it requires
    action from the user (action items assigned, questions directed at
    the user, review requests, deadlines, @ mentions).

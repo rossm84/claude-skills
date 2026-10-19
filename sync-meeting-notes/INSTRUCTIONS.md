@@ -47,13 +47,9 @@ off-track:**
 **STOP. Reset. Do this:**
 1. Look at your working table — find the next row by its **name**
    (title)
-2. Call `get_document_structure` on `user-google-drive-mcp` with that
-   row's `fileId`
-3. Read `totalSections` from the response
-4. Call `get_document_section` with mechanically constructed section
-   IDs (`section-0`, `section-1`, ...)
-5. The `content` fields in that response ARE the document content —
-   concatenate them
+2. Call `execute_tool` on `user-gws-mcp` with name `gdocs.get_document`
+   and `document_id` set to that row's file id
+3. The returned content IS the document content — parse it directly
 
 **A `fileId` is an opaque token. You pass it to MCP tools. That is
 its ONLY use. You never read it, open it, display it, or treat it as
@@ -61,10 +57,9 @@ content or a file path.**
 
 ## Prerequisites
 
-- A Google Drive MCP server exposing `list_drive_files`,
-  `get_document_structure`, and `get_document_section` tools. This
-  skill uses the server ID `user-google-drive-mcp` by default —
-  substitute the server ID in your fork if you use a different one.
+- Google Workspace MCP (`user-gws-mcp`). Call `execute_tool` with
+  `gdrive.search_files`, `gdocs.get_document`, and
+  `gdrive.list_comments`. Do not use `google-drive-mcp`.
 - A `notes/meetings/` directory in the workspace (auto-created on
   first run if missing).
 
@@ -99,11 +94,14 @@ lookup set.
 
 ## Step 2: Search Google Drive
 
-Call the MCP tool `list_drive_files` on server `user-google-drive-mcp`:
+Call `execute_tool` on `user-gws-mcp`:
 
 ```
-query: "- Notes by Gemini"
-maxResults: 100
+name: "gdrive.search_files"
+args:
+  query: "Notes by Gemini"   # then run again with query: "[Notes Only]" and merge the results (new title format)
+  file_type: "document"
+  max_results: 100
 ```
 
 This returns a list of files with `id`, `name`, `web_view_link`, and
@@ -115,8 +113,7 @@ This returns a list of files with `id`, `name`, `web_view_link`, and
 forget everything else.**
 
 **Do NOT call any MCP tools during this step.** No
-`get_document_structure`, no `get_document_preview`, no
-`get_drive_file_content`. The decision of which documents to process
+`gdocs.get_document` and no `gdrive.read_file`. The decision of which documents to process
 is based ENTIRELY on the file `name` (title) and `id` (sync log check)
 from the search results you already have. Do not fetch or inspect
 document content until Step 4.
@@ -128,10 +125,11 @@ soon as one fails:
 
 1. `mime_type` must be `application/vnd.google-apps.document` (skip
    folders, shortcuts, videos)
-2. `name` must end with `- Notes by Gemini` (after trimming
-   whitespace)
-3. `name` must match the regex
-   `/.+ - \d{4}\/\d{2}\/\d{2} .+ - Notes by Gemini$/`
+2. `name` must be a Gemini notes title, in either format (after trimming whitespace):
+   - old: ends with `- Notes by Gemini`, matching `/.+ - \d{4}\/\d{2}\/\d{2} .+ - Notes by Gemini$/`
+   - new (since Oct 2026): starts with `[Notes Only] `, matching `/^\[Notes Only\] .+ - \d{4}\/\d{2}\/\d{2} \d{2}:\d{2} \S+$/`
+   Skip `[Transcript Only]` copies (the notes doc covers the same meeting).
+3. (merged into 2)
 4. File `id` must NOT appear in the **skip-set** from Step 1 (covers
    both synced and ignored IDs)
 
@@ -192,7 +190,9 @@ future runs once the ignore list is populated.
 For each document in the capped list:
 
 1. **Parse the title** — Gemini notes follow:
-   `"Meeting Name - YYYY/MM/DD HH:MM TZ - Notes by Gemini"`
+   `"Meeting Name - YYYY/MM/DD HH:MM TZ - Notes by Gemini"`, or (new format)
+   `"[Notes Only] Meeting Name - YYYY/MM/DD HH:MM TZ"`: drop the `[Notes Only] ` prefix and treat it as if
+   it ended with ` - Notes by Gemini`.
    Split from the RIGHT on ` - ` to extract:
    - Everything before the second-to-last ` - ` = **meeting name**
    - Second-to-last segment = **datetime string**
@@ -220,62 +220,32 @@ IDs only.
 |----|--------|
 | Identify documents by their **`name`** (title) from your working table | NEVER print, echo, or reason about a `fileId` string — it is opaque |
 | Pass `fileId` as a parameter to MCP tools (copy-paste, don't inspect) | NEVER pass a `fileId` to the `Read` tool — file IDs are NOT file paths |
-| Get content ONLY from `get_document_structure` + `get_document_section` | NEVER treat any string from the working table as document content |
+| Get content ONLY from `gdocs.get_document` | NEVER treat any string from the working table as document content |
 | Process one document at a time: fetch → extract → sync log → next | NEVER carry content from one document into the next |
 | If a tool returns empty/error, retry the SAME MCP tool call | NEVER ask the user for content or say you "can't access" a document |
 
 **What is a `fileId`?** An opaque Google Drive identifier like
 `1uTBf2UA0Vx7...`. You cannot read it. You cannot open it. You can
-ONLY pass it as the `fileId` argument to an MCP tool on
-`user-google-drive-mcp`. That's its only purpose.
+ONLY pass it as `document_id` or `file_id` to `execute_tool` on
+`user-gws-mcp`. That's its only purpose.
 
-### How to fetch a single document (exactly 2 MCP calls)
+### How to fetch a single document (1 MCP call)
 
-For each row in your working table, say to yourself: "I am now
-fetching **{name}**" (using the document TITLE, not the ID). Then make
-these two calls:
-
-**Call 1 — Get the section count:**
+For each row, say: "I am now fetching **{name}**" (the title, not the ID).
 
 ```
-Tool: get_document_structure
-Server: user-google-drive-mcp
-Arguments: { "fileId": "<copy fileId from working table row>" }
-```
-
-From the response, read ONLY the `totalSections` number. **That
-integer is the ONLY thing you need from this response.** Ignore
-section titles, previews, summary text, and internal IDs.
-
-**Call 2 — Get all sections:**
-
-Construct section IDs mechanically: `section-0` through
-`section-(N-1)` where N = `totalSections`. Do NOT use section IDs
-from the API response.
-
-Examples:
-- `totalSections` = 5 → `["section-0", "section-1", "section-2", "section-3", "section-4"]`
-- `totalSections` = 12 → `["section-0", "section-1", ... , "section-11"]`
-
-**Transcript guard:** If `totalSections` > 30, only fetch sections
-0–4.
-
-```
-Tool: get_document_section
-Server: user-google-drive-mcp
+Tool: execute_tool
+Server: user-gws-mcp
 Arguments: {
-  "fileId": "<same fileId as Call 1>",
-  "sectionIds": ["section-0", "section-1", ...],
-  "includeSubsections": true
+  "name": "gdocs.get_document",
+  "args": { "document_id": "<copy fileId from working table row>" }
 }
 ```
 
-Concatenate all returned section `content` fields in order — that's
-the document body.
+The response is the full document. Parse it directly.
 
-**Fallback:** If `totalSections` is 0 or missing, use
-`get_drive_file_content` with offset-based pagination (1000 chars per
-call, incrementing `offset` by 1000) until `hasMore` is false.
+**Fallback:** If that returns empty or errors, call `execute_tool`
+name `gdrive.read_file` with `file_id` set to the same token.
 
 **Then immediately extract insights (Step 5) and update the sync log
 (Step 6) before fetching the next document.**
@@ -482,18 +452,15 @@ confuses Google Drive file IDs with file paths or document content.
 
 | Identifier type | What it looks like | What you do with it |
 |---|---|---|
-| Google Drive `fileId` | `1uTBf2UA0Vx7GZ...` (long alphanumeric) | Pass to MCP tools as `fileId` param. NOTHING ELSE. |
-| Section index | `section-0`, `section-1`, etc. | You build these from `totalSections`. Pass to `get_document_section`. |
+| Google Drive `fileId` | `1uTBf2UA0Vx7GZ...` (long alphanumeric) | Pass to `gdocs.get_document` as `document_id`, or `gdrive.read_file` as `file_id`. NOTHING ELSE. |
 | Document name | `"Team Standup - 2026/03/18 10:00 EDT - Notes by Gemini"` | Human-readable title. Use to identify which doc you're processing. |
 
-**These three things are completely different. Never substitute one
+**These two things are completely different. Never substitute one
 for another.**
 
 - `fileId` → MCP tools only (never `Read`, never display)
 - Document name → working table reference only (never pass to MCP
-  tools as fileId)
-- Section index → `get_document_section` only (you build these,
-  never from API)
+  tools as document_id)
 
 ---
 
