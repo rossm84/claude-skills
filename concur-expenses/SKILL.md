@@ -13,6 +13,7 @@ Never click **Submit Claim**. Ross submits. Saving lines is OK once he has appro
   - Outlook-for-Android "attachments" are usually **OneDrive 1drv.ms links**. Open each link in the browser, take the biggest `<img>` (a blob: URL) and read it in-page with fetch + FileReader. Direct curl to OneDrive is blocked by the sandbox.
   - Real Gmail attachments: open the `download_url` (switch `disp=safe` to `disp=inline`) in a new tab and screenshot the `<img>` at natural size. Don't fetch them with session cookies (blocked, and against Ross's rules).
   - E-receipts (SumUp, Uber, hotels) are in Gmail: screenshot the message body (`div.adn`).
+  - **Before marking any line "No Receipt", search Gmail for the merchant around that date** (`<merchant> after:D-1 before:D+2`). Order-and-pay apps (Wetherspoon), SumUp, Uber, hotels and airlines email itemised receipts. The card-feed city can be the merchant's head office (Wetherspoon showed "Watford" for Edinburgh Airport).
   - Citi "Notification of transaction" emails confirm amounts. A big hotel charge on check-in day is a **pre-auth**.
 - **Before screenshotting**: bring the tab to the front. Background tabs hang. Never `setViewportSize` on the shared context; it shrinks Ross's window. If you do, reset with `Emulation.clearDeviceMetricsOverride`.
 
