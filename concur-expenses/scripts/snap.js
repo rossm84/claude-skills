@@ -1,7 +1,7 @@
 const { chromium } = require('/home/rossmiller/notes/site-audit/node_modules/playwright');
 (async () => {
-  const v = await (await fetch('http://172.23.48.1:9223/json/version',{headers:{Host:'localhost'}})).json();
-  const ws = v.webSocketDebuggerUrl.replace(/ws:\/\/[^/]+/, 'ws://172.23.48.1:9223');
+  const v = await (await fetch('http://172.23.48.1:9224/json/version',{headers:{Host:'localhost'}})).json();
+  const ws = v.webSocketDebuggerUrl.replace(/ws:\/\/[^/]+/, 'ws://172.23.48.1:9224');
   const b = await chromium.connectOverCDP(ws, { headers: { Host: 'localhost' } });
   const p = b.contexts().flatMap(c => c.pages()).find(p => p.url().includes('concursolutions'));
   console.log(p.url());
