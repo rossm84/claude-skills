@@ -245,6 +245,10 @@ what changed.
 **Include the current conversation** (the one where "wrap up" was
 triggered) in the synthesis.
 
+### Sent-message sweep
+
+Before listing open items or reminders, read all of Ross's sent Slack messages for the day (paginate every `cursor` page, as in Preflight Step 2), so that anything he has already answered is dropped and any promises he made ("I'll publish once it's back") become open items or reminder candidates.
+
 ### No-op check
 Before continuing, **skip entirely** if all three are true:
 - No transcripts from today (or only trivial activity — a single quick

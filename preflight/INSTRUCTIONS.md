@@ -254,6 +254,16 @@ explicitly (OAuth scope `im:history`/`mpim:history` likely missing).
 Per channel/DM: read last 24h (72h Mondays), max 50 messages. Read
 threads on any message with `reply_count > 0`.
 
+**Sent-message sweep (required, before classifying anything).** Run
+`slack_search_public_and_private` with `filters: "from:<@my_user_id> after:<YYYY-MM-DD>"`,
+`sort: timestamp`, and **follow `cursor` through every page** until
+"End of results". Never stop at the first 20. Build a set of
+conversations/threads Ross posted in, and the time of his latest message in each. A DM or
+thread counts as **Handled** if Ross's latest message is newer than the other person's.
+If a lookup can't confirm it (e.g. name filter returns nothing), read
+the DM with `slack_read_channel` instead of guessing. Never mark an item
+unreplied without this check.
+
 **Before classifying a thread, check if the user already replied.**
 Read thread replies and check whether any is from `my_user_id`. If
 yes, classify as **Handled** and skip. Count handled and report
