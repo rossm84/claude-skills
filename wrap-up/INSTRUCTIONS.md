@@ -369,6 +369,25 @@ Format each candidate:
 Cap at 5 candidates per day. Quality over quantity. If none found,
 omit the sub-section.
 
+## Step 4b: Reminder candidates (calendar)
+
+Scan the Slack, Gmail and meeting-note items already gathered for
+**dated commitments**: someone gives a deadline ("by Nov 3rd"), Ross
+agrees to deliver something later ("I'll pull it once it's back up"),
+or a follow-up date is set ("after wellness week", "until Oct 30").
+
+For each, propose a reminder: title (`Reminder: <verb> <thing> for <person>`),
+date/time (a 30-min slot before the stated deadline, working hours, Europe/London,
+avoiding existing meetings), and a description with the source link.
+Skip anything already on the calendar (check with `gcal.list_events`
+across the date) or already done.
+
+Render as a numbered `## Step 4b: Reminders to add` list. **Never create
+without approval.** When Ross says "add N" / "add all", create each with
+`gcal.create_event` on his primary calendar, no attendees, a popup
+reminder, then confirm with the event link. Record created reminders
+in the state file so they're not proposed again.
+
 ## Step 5: Report & Apply After Review
 
 Tell the user:

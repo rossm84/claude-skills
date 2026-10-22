@@ -83,7 +83,7 @@ setup. Reserve plain-text prompting for open-ended questions only.
 
 ## Prerequisites
 
-- At least one MCP connected (Slack, Google Calendar, or Google Drive).
+- At least one MCP connected: Slack, or Google Workspace (`gws-mcp`).
 - `.preflight.md` config file in workspace root (auto-created on first run).
 
 ---
@@ -115,8 +115,7 @@ Perform silently — no output.
 
 **MCP servers:** test each with a lightweight call:
 - **Slack** — `slack_search_channels` ("general", limit 1)
-- **Google Calendar** — `list_calendar_events` (today, max 1)
-- **Google Drive** — `list_drive_files` ("Notes by Gemini", max 1)
+- **Google Workspace (`gws-mcp`)** — `execute_tool` name `gcal.list_events` (today, max 1)
 
 Record responses. Do not retry failures.
 
@@ -179,13 +178,12 @@ flow. It exists to keep the wrap-up → Preflight pipeline healthy.
 
 ### Step 0b: MCP health check (run before all data-gathering steps)
 
-Ping each data-source MCP with a lightweight call. Run all three in parallel.
+Ping Slack and Google Workspace with a lightweight call. Run both in parallel.
 
 | MCP | Health call |
 |---|---|
-| Google Calendar | `list_calendar_events` with today's date, `max_results: 1` |
 | Slack | `slack_read_user_profile` with no arguments |
-| Google Drive | `list_drive_files` with `maxResults: 1`, empty query |
+| Google Workspace | `execute_tool` name `gcal.list_events`, today, `max_results: 1` |
 
 **If any call fails or returns "Not connected":** stop the briefing
 immediately and output a single consolidated block — do NOT proceed to
@@ -195,20 +193,23 @@ Steps 1–5 with broken MCPs:
 ## MCP Health Check — action required before briefing
 
 - Slack: NOT CONNECTED — re-auth at backstage.spotify.net/mcp-explorer/link/slack-mcp
-- Google Drive: NOT CONNECTED — re-auth at backstage.spotify.net/mcp-explorer/link/google-drive-mcp
-- Google Calendar: OK
+- Google Workspace: NOT CONNECTED — re-auth at backstage.spotify.net/mcp-explorer/link/gws-mcp
 
 Fix the above, then say "preflight" again to run the full briefing.
 ```
 
-**If all three respond successfully:** proceed silently to Step 1. Do not
+**If both respond successfully:** proceed silently to Step 1. Do not
 mention the health check in the briefing output.
 
 ### Step 1: Calendar
 
 ```
-list_calendar_events
-  date: "<today as YYYY-MM-DD>"
+execute_tool on user-gws-mcp
+name: "gcal.list_events"
+args:
+  time_min: "<today>T00:00:00"
+  time_max: "<today>T23:59:59"
+  timezone: "<IANA timezone from Phase 1>"
   max_results: 7
 ```
 
@@ -311,11 +312,15 @@ Gather docs from three sources:
 
 Deduplicate by doc ID. Skip docs matching `Scanned Docs` in state.
 
+Search with `execute_tool` name `gdrive.search_files`
+(`file_type: "document"`, `max_results: 10`).
+
 Per doc:
-1. Fetch structure via `get_document_structure` (stripImages: true).
-   Fallback to `get_document_preview` on failure.
+1. `execute_tool` name `gdocs.get_document`, `document_id` = the file id.
+   One call returns the full doc. If it fails, `gdrive.read_file` with
+   `file_id`.
 2. Parse unchecked items matching recipient's name.
-3. Fetch unresolved comments — surface @mentions and action language.
+3. Comments: `execute_tool` name `gdrive.list_comments`, `file_id`.
 4. Apply Resolution check and Ownership filter below.
 
 **Ownership filter:**
@@ -346,6 +351,25 @@ conflicts with a meeting note, use rolling-context only.
 ### Step 5: Wrap-up draft
 
 Count pending entries by section. Report totals. Skip if empty/absent.
+
+### Step 6: Reminder candidates (calendar)
+
+Scan the Slack, Gmail and meeting-note items already gathered for
+**dated commitments**: someone gives a deadline ("by Nov 3rd"), Ross
+agrees to deliver something later ("I'll pull it once it's back up"),
+or a follow-up date is set ("after wellness week", "until Oct 30").
+
+For each, propose a reminder: title (`Reminder: <verb> <thing> for <person>`),
+date/time (a 30-min slot before the stated deadline, working hours, Europe/London,
+avoiding existing meetings), and a description with the source link.
+Skip anything already on the calendar (check with `gcal.list_events`
+across the date) or already done.
+
+Render as a numbered `### Step 6: Reminders to add` list. **Never create
+without approval.** When Ross says "add N" / "add all", create each with
+`gcal.create_event` on his primary calendar, no attendees, a popup
+reminder, then confirm with the event link. Record created reminders
+in the state file so they're not proposed again.
 
 ---
 
