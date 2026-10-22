@@ -245,6 +245,13 @@ what changed.
 **Include the current conversation** (the one where "wrap up" was
 triggered) in the synthesis.
 
+### Slack: received messages and all notifications
+
+Run SunUp's Step 2 Slack sources for **today** (00:00 Europe/London to now), including item 5, the
+full notifications sweep: every DM and group DM received, @mentions and group mentions, replies in threads Ross is
+in, app/bot DMs, then open each notification's source thread or channel and read the context. Classify each as
+needs Ross / FYI / already answered, and carry "needs Ross" items into the open items and reminder candidates.
+
 ### Sent-message sweep
 
 Before listing open items or reminders, read all of Ross's sent Slack messages for the day (paginate every `cursor` page, as in Preflight Step 2), so that anything he has already answered is dropped and any promises he made ("I'll publish once it's back") become open items or reminder candidates.

@@ -245,6 +245,16 @@ Store `my_user_id` and `first_name`.
    against named partners, then `slack_read_channel` each.
 4. **@mention backstop** — `to:me` also surfaces @mentions in
    channels the user isn't in. Include those.
+5. **Full notifications sweep (Ross, 22 Oct 2026: "all notifications, then look in the channel where it was raised").**
+   Not just @mentions: everything that would land in his Slack Activity feed for the window, received AND sent:
+   - @mentions of him, and @here / @channel / group handles (e.g. @community-team) in channels he's in.
+   - New replies in threads he started or replied to in the last 7 days (re-read each of those threads).
+   - Every DM and group DM with activity in the window, including app/bot DMs (Jira, Google Drive/Calendar,
+     GitHub/GHE, Workday, Groove…).
+   - Keyword highlights and reactions on his messages, where the tools expose them.
+   For **each notification, open the source** (`slack_read_thread` for threads, `slack_read_channel` around the ts
+   for channel posts) and read the surrounding conversation before classifying it. Classify as **needs Ross**
+   (who, channel, the ask, link), **FYI**, or **already answered** (use the sent-message sweep below).
 
 Only skip a DM source if the user explicitly says "only named
 partners" or "don't scan DMs" — **never skip silently**. If
