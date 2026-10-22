@@ -313,6 +313,41 @@ Slack source wins.
 
 Filter out threads in `.preflight-state.md` `Handled Slack Items`.
 
+
+## Extra checks (Ross, 22 Oct 2026: "do that entire list")
+
+Run these alongside the Slack/Gmail/calendar steps (in parallel where possible). Each feeds the open items and
+reminder candidates. Keep each to a few lines in the output; skip a section with nothing in it. If a source can't be
+reached (e.g. headless runs without that connector), say "not checked" for it, never guess.
+
+1. **Setlist health** (`~/community-tools`; gcloud as rossmiller@spotify.com, project spotify-community):
+   - Live version: `curl -s https://spotify-community.web.app/nsacm/changelog.json` (top release).
+   - Errors and slow requests since the last run: `gcloud logging read` on `resource.type="gae_app"`,
+     `module_id="community-export"` request_log; report 5xx count and the p90 of user-facing `/api/nsacm/*`
+     routes (exclude cron: tick, poll, spam/live, premod/attack, health-check). Flag any route with p90 > 5 s.
+   - Overnight (SunUp) or today (SunDown): Missed posts, the coverage check result, and any spam attack
+     (Firestore `nsacm_meta/spam_attack` `active`, or the coverage email in Gmail).
+   - SunDown also: posts closed today and anything still waiting past its reply target, if the Reports API or
+     the coverage email shows it.
+2. **PRs, reviews and agents:** `gh pr list --repo community-platform/community-tools --state open` (and
+   `--author @me`); for each, the latest Xirp verdict (issues waiting on Ross, or clean and ready to merge).
+   Honk sessions: `list_honk_sessions` / `get_honk_session` for sessions that finished or failed since the last run.
+   Failed deploys or CI checks on master.
+3. **Jira and Groove:** Jira issues assigned to Ross or updated since the last run (Atlassian MCP
+   `searchJiraIssuesUsingJql`, e.g. `assignee = currentUser() AND updated >= -1d`), plus S4D/DoD health updates due
+   this week in Groove and any blockers.
+4. **Community site:** HLV and community.spotify.com up (curl the homepage and an API path, status 200), certificate
+   expiry (`echo | openssl s_client -connect community.spotify.com:443 2>/dev/null | openssl x509 -noout -enddate`;
+   flag under 30 days), and Ongoing Issues that changed (HLV API, category Ongoing Issues).
+5. **People:** who on the Community team and close collaborators is off today or tomorrow (calendar OOO events,
+   Slack status), and birthdays or work anniversaries if Bandmanager exposes them.
+6. **Meeting prep (SunDown for tomorrow, SunUp for today):** for each meeting, the last notes with those people
+   (Drive "Notes by Gemini" / `notes/meetings/`) and any open actions Ross owns from them, one line each.
+7. **Costs (weekly, Mondays, or when asked):** open Cloud Billing reports for project spotify-community in Ross's
+   Chrome (billing account 01EB05-B1778F-D20612, read-only) and report month-to-date, forecast and any jump over 25%.
+8. **Follow-ups owed to Ross:** things others promised him (Slack/Gmail/meeting notes: "I'll send…", "by Friday")
+   that are now overdue, with who and where.
+
 ### Step 3: Google Doc action items
 
 **Classification rules:** An extracted line qualifies ONLY if it meets ALL three:
