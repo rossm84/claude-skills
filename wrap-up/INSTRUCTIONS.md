@@ -408,8 +408,9 @@ Tell the user:
 - How many learnings were captured (if any)
 - Any files that were skipped because they don't exist (e.g., "skipped
   rolling-context comparison — file not configured")
-- Ask: **"Want me to apply the rolling context updates and learnings
-  now?"**
+- **Ross (22 Oct 2026): don't ask.** Apply the rolling context updates, learnings and memory changes
+  straight away (they only touch local notes and memory), then list what changed. Still ask before
+  creating calendar reminders, sending anything, or editing a repo that needs a PR.
 
 If the user confirms, read the timestamped section you just wrote in
 `notes/wrap-up-draft.md` and apply the changes to the real files. If
