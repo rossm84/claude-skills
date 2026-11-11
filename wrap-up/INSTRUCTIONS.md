@@ -78,6 +78,11 @@ destination files without explicit user approval.
 
 ## Step 0: Extract Meeting Notes
 
+> **Always scan call notes (Ross, 11 Nov 2026).** Every SunUp and SunDown run must read every "Notes by Gemini"
+> email (from:gemini-notes@google.com) and Drive notes doc since the last run that isn't in Scanned Docs, plus
+> Melody's shared notes doc after mod calls. Never skip this step or leave notes "not scanned yet". Pull out
+> Ross's actions, decisions and follow-ups owed to him, then add each note's ID to Scanned Docs.
+
 Before reading transcripts, check Google Drive for new "Notes by Gemini"
 meeting notes and recently shared documents.
 

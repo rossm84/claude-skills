@@ -350,6 +350,11 @@ reached (e.g. headless runs without that connector), say "not checked" for it, n
 
 ### Step 3: Google Doc action items
 
+> **Always scan call notes (Ross, 11 Nov 2026).** Every SunUp and SunDown run must read every "Notes by Gemini"
+> email (from:gemini-notes@google.com) and Drive notes doc since the last run that isn't in Scanned Docs, plus
+> Melody's shared notes doc after mod calls. Never skip this step or leave notes "not scanned yet". Pull out
+> Ross's actions, decisions and follow-ups owed to him, then add each note's ID to Scanned Docs.
+
 **Classification rules:** An extracted line qualifies ONLY if it meets ALL three:
 
 1. **Structure** — verb-initial imperative OR subject + future verb.
